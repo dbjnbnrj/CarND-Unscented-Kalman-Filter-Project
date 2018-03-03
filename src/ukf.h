@@ -67,6 +67,10 @@ public:
   ///* Sigma point spreading parameter
   double lambda_;
 
+  double NIS_laser_;
+
+  double NIS_radar_;
+
 
   /**
    * Constructor
@@ -84,6 +88,18 @@ public:
    */
   void ProcessMeasurement(MeasurementPackage meas_package);
 
+  void GenerateSigmaPoints(MatrixXd *Xsig_out);
+
+  void AugmentSigmaPoints(MatrixXd *Xsig_out);
+
+  void PredictSigmaPoints(MatrixXd *Xsig_aug, double delta_t);
+
+  void SetWeights();
+
+  void PredictStateMean();
+
+  void PredictStateCovarianceMatrix();
+
   /**
    * Prediction Predicts sigma points, the state, and the state covariance
    * matrix
@@ -96,6 +112,13 @@ public:
    * @param meas_package The measurement at k+1
    */
   void UpdateLidar(MeasurementPackage meas_package);
+
+  /**
+   * Normalizing Angles used for radar measurement
+   * @param vector Input vector of radar measurements
+   * @param idx Index of phi to be normalized
+   */
+  void NormalizeAngles(VectorXd *v, int idx);
 
   /**
    * Updates the state and the state covariance matrix using a radar measurement
