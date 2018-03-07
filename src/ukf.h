@@ -58,6 +58,11 @@ public:
   ///* Weights of sigma points
   VectorXd weights_;
 
+  // Laser measurement matrix
+  MatrixXd H_;
+
+  MatrixXd R_laser_;
+
   ///* State dimension
   int n_x_;
 

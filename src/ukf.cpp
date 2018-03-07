@@ -26,11 +26,12 @@ UKF::UKF() {
   // initial covariance matrix
   P_ = MatrixXd::Identity(5, 5);
 
+
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1.5;
+  std_a_ = 0.9;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.3;
+  std_yawdd_ = 0.4;
 
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -65,6 +66,16 @@ UKF::UKF() {
   ///* Weights of sigma points
   weights_ = VectorXd(2 * n_aug_ +1);
 
+  //  Lidar Measurement Matrix
+  H_ = MatrixXd(2, n_x_);
+  H_.fill(0.0);
+  H_(0, 0) = 1;
+  H_(1, 1) = 1;
+
+  R_laser_ = MatrixXd(2, 2);
+  R_laser_ << std_laspx_ *std_laspx_, 0,
+  0, std_laspy_ *std_laspy_;
+
   ///* predicted sigma points matrix
   Xsig_pred_ = MatrixXd(n_x_, 2 * n_aug_ + 1);;
 
@@ -89,7 +100,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       if (!is_initialized_) {
 
         time_us_ = meas_package.timestamp_;
-        x_.fill(1.0);
+        x_.fill(0.0);
 
         P_ = MatrixXd::Identity(5, 5);
 
@@ -263,48 +274,20 @@ void UKF::Prediction(double delta_t) {
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   VectorXd z = meas_package.raw_measurements_;
+  VectorXd z_pred = H_ * x_;
+  VectorXd y = z - z_pred;
+  MatrixXd Ht = H_.transpose();
+  MatrixXd S = H_ * P_ * Ht + R_laser_;
+  MatrixXd Si = S.inverse();
+  MatrixXd PHt = P_ * Ht;
+  MatrixXd K = PHt * Si;
 
-  int n_z = 2; // only px py
-  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
-  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
-    Zsig(0, i) = Xsig_pred_(0, i);
-    Zsig(1, i) = Xsig_pred_(1, i);
-  }
+  //new estimate
+  x_ = x_ + (K * y);
+  long x_size = x_.size();
+  MatrixXd I = MatrixXd::Identity(x_size, x_size);
+  P_ = (I - K * H_) * P_;
 
-  VectorXd z_pred = VectorXd(n_z); // mean vector
-  z_pred.fill(0.0);
-  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
-    z_pred = z_pred + weights_(i) * Zsig.col(i);
-  }
-
-  // covariance matrix
-  MatrixXd S(n_z, n_z);
-  S.fill(0.0);
-  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
-    VectorXd z_diff = Zsig.col(i) - z_pred;
-    S = S + weights_(i) * z_diff * z_diff.transpose();
-  }
-  // noise matrix
-  MatrixXd R(n_z, n_z);
-  R << std_laspx_*std_laspx_, 0,
-       0, std_laspy_*std_laspy_;
-  S = S + R;
-
-  // cross correlation matrix
-  MatrixXd Tc(n_x_, n_z);
-  Tc.fill(0.0);
-
-  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
-    VectorXd z_diff = Zsig.col(i) - z_pred;
-    VectorXd x_diff = Xsig_pred_.col(i) - x_;
-    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
-  }
-
-  MatrixXd K = Tc * S.inverse();
-  VectorXd z_diff = z - z_pred;
-  NIS_laser_ = z_diff.transpose() * S.inverse() * z_diff;
-  x_ = x_ + K * z_diff;
-  P_ = P_ - K*S*K.transpose();
 }
 
 void UKF::NormalizeAngles(VectorXd *v, int idx){
